@@ -1,4 +1,4 @@
---@name GifSpritesheet(translucent)
+--@name GifSpritesheet(test2)
 --@author Sparky
 --@client
 
@@ -35,6 +35,8 @@ local function addWorker(worker)
         workers[#workers+1] = worker
     end
 end
+
+-------------------------------------------------
 
 local gifdecoder = class("gifdecode")
 local spritesheet = class("spritesheet")
@@ -76,6 +78,7 @@ render.createRenderTarget("gifcanvas")
 gifdecoder.drawMaterial = material.create("UnlitGeneric")
 gifdecoder.drawMaterial:setTextureRenderTarget("$basetexture", "gif")
 
+-- CORREO 1: Ativa a translucncia para que o decodificador preserve o Alpha do GIF original
 gifdecoder.drawMaterial:setInt("$translucent", 1)
 
 function gifdecoder:initialize(data)
@@ -161,13 +164,20 @@ function gifdecoder:renderImg(img, frame, i)
     done = false
     hook.add("renderoffscreen","gifspritesheet",function()
         render.selectRenderTarget("gifcanvas")
-
+        
+        -- CORREO 2: Substitudo 'if first then' que continha uma varivel inexistente por 'if i == 1'
         if i == 1 then render.clear(Color(0,0,0,0),true) end
         
         render.setMaterial(gifdecoder.drawMaterial)
         render.drawTexturedRectUV(1, 1, self.w, self.h, 1/1024, 1/1024, (1+self.w)/1024, (1+self.h)/1024)
         
         render.selectRenderTarget(frame.rt)
+        
+        -- CORREO 3 (MOVIDA PARA C): Limpa o Render Target de forma 100% segura apenas no primeiro frame dele
+        if frame.x == 1 and frame.y == 1 then
+            render.clear(Color(0, 0, 0, 0), true)
+        end
+        
         render.setRenderTargetTexture("gifcanvas")
         render.drawTexturedRectUV(frame.x, frame.y, frame.w, frame.h, 1/1024, 1/1024, (1+self.w)/1024, (1+self.h)/1024)
         if img.disposal==2 then render.selectRenderTarget("gifcanvas") render.clear(Color(0,0,0,0),true) end
@@ -178,6 +188,8 @@ function gifdecoder:renderImg(img, frame, i)
 
     while not done do coroutine.yield("wait") end
 end
+
+-------------------------------------------------
 
 local rtIndex = 0
 function spritesheet:initialize(maxRTs, w, h, nframes)
@@ -201,8 +213,7 @@ function spritesheet:initialize(maxRTs, w, h, nframes)
             render.createRenderTarget(rt)
             rtIndex = rtIndex + 1
             
-            render.selectRenderTarget(rt)
-            render.clear(Color(0, 0, 0, 0), true)
+            -- O cdigo problemtico que gerava o erro foi removido daqui e levado para o hook correto acima!
             
             for x=1, nx*(w+1), (w+1) do
                 for y=1, ny*(h+1), (h+1) do
@@ -226,6 +237,8 @@ function spritesheet:draw(x, y, w, h, dt)
     render.setRenderTargetTexture(frame.rt)
     render.drawTexturedRectUV(x, y, w, h, frame.u1, frame.v1, frame.u2, frame.v2)
 end
+
+-------------------------------------------------
 
 local queue = {}
 local function gifToSpritesheet(data, maxRTs, doneCb)
